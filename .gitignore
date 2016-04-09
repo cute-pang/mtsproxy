@@ -1,0 +1,7 @@
+#gcc object file
+*.[oa]
+
+#.DS_Store & .gitignore
+.DS_Store
+.gitignore
+
