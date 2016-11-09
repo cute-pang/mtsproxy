@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*- 
 
+from pub.py import *
+
 import socket, select
 
 EOL1 = b'\n\n'
