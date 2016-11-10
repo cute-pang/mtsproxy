@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*- 
 
 from pub.py import *
-
 import socket, select
+
 
 EOL1 = b'\n\n'
 EOL2 = b'\n\r\n'
@@ -32,6 +32,10 @@ try:
             connections[connection.fileno()] = connection
             requests[connection.fileno()] = b''
             responses[connection.fileno()] = response
+         elif event & select.EPOLLHUP:
+            epoll.unregister(fileno)
+            connections[fileno].close()
+            del connections[fileno]
          elif event & select.EPOLLIN:
             requests[fileno] += connections[fileno].recv(1024)
             if EOL1 in requests[fileno] or EOL2 in requests[fileno]:
@@ -43,10 +47,7 @@ try:
             if len(responses[fileno]) == 0:
                epoll.modify(fileno, 0)
                connections[fileno].shutdown(socket.SHUT_RDWR)
-         elif event & select.EPOLLHUP:
-            epoll.unregister(fileno)
-            connections[fileno].close()
-            del connections[fileno]
+         
 finally:
    epoll.unregister(serversocket.fileno())
    epoll.close()
