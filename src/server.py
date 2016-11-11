@@ -17,39 +17,38 @@ def main_loop():
 	epoll.register(ssock.fileno(), select.EPOLLIN)
 
 	try:
-	   
-	   while True:
-	      events = epoll.poll(1)
-	      for fileno, event in events:
-	         if fileno == ssock.fileno():
-	         	#建立连接
-	            connection, address = ssock.accept()
-	            connection.setblocking(0)
+        while True:
+            events = epoll.poll(1)
+            for fileno, event in events:
+                if fileno == ssock.fileno():
+                    #建立连接
+                    connection, address = ssock.accept()
+                    connection.setblocking(0)
 
-	            #初始化节点
-	            normal_node = node()
-	            normal_node.conn = connection
-	            normal_node.node_type = NODE_TYPE_PROXY_CLIENT
+                    #初始化节点
+                    normal_node = node()
+                    normal_node.conn = connection
+                    normal_node.node_type = NODE_TYPE_PROXY_CLIENT
 
-	            #注册epoll事件
-	            epoll.register(connection.fileno(), select.EPOLLIN)
-	            node[connection.fileno()] = normal_node
+                    #注册epoll事件
+                    epoll.register(connection.fileno(), select.EPOLLIN)
+                    node[connection.fileno()] = normal_node
 
-            elif event & select.EPOLLHUP:
-                node[fileno].handle_close()
+                elif event & select.EPOLLHUP:
+                    node[fileno].handle_close()
             
-	         elif event & select.EPOLLIN:
-                data += node[fileno].conn.recv(1024)
+                elif event & select.EPOLLIN:
+                    data += node[fileno].conn.recv(1024)
                 
-                if node[fileno].node_type is NODE_TYPE_PROXY_CLIENT:
-                    node[fileno].down_flow += data
-                elif node[fileno].node_type is NODE_TYPE_PROXY_SERVER:
-                    node[fileno].up_flow += data
+                    if node[fileno].node_type is NODE_TYPE_PROXY_CLIENT:
+                        node[fileno].down_flow += data
+                    elif node[fileno].node_type is NODE_TYPE_PROXY_SERVER:
+                        node[fileno].up_flow += data
                 
-                node[fileno].handle_flow()
+                    node[fileno].handle_flow()
                     
-	         elif event & select.EPOLLOUT:
-	            node[fileno].handle_flow()           
+                elif event & select.EPOLLOUT:
+                    node[fileno].handle_flow()           
                 
 	finally:
 	   epoll.unregister(ssock.fileno())
