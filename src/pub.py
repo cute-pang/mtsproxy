@@ -48,7 +48,7 @@ class node():
 		#上行/下行描述符，如果为-1，则使用sockfd收发数据
 		self.upward_fd = -1
 		self.downward_fd = -1
-		self.sockfd = -1
+		self.conn = -1
 
 		#设置节点收发缓冲区
 		self.down_flow = None
@@ -57,16 +57,14 @@ class node():
         self.node_type = -1
 
 	def handle_flow(self):
-        #没有数据
-        if self.flow is None:
-            pass
-            
         #如果是普通的客户端节点
 		if self.node_type is NODE_TYPE_NORMAL_CLIENT:
             #处理上行流量
 			if self.up_flow is not None:
-				self.sockfd.send(self.up_flow.data)
-                self.up_flow = None
+                byteswritten = self.conn.send(self.up_flow)
+	            self.up_flow = self.up_flow[byteswritten:]
+                if len(self.up_flow) == 0:
+                    self.up_flow = None
 			
             #处理下行流量
             if self.down_flow is not None:
@@ -76,31 +74,22 @@ class node():
                     #初始化代理node
                     node[tmp_sk_fd] = node()
                     node[tmp_sk_fd].upward_fd = self.sockfd
-                    node[tmp_sk_fd].sockfd = tmp_sk_fd
+                    node[tmp_sk_fd].conn = sock
                     node[tmp_sk_fd].node_type = NODE_TYPE_NORMAL_SERVER
                     self.downward_fd = tmp_sk_fd
-                    epoll.register(tmp_sk_fd, select.EPOLLIN)
+                    epoll.register(tmp_sk_fd, select.EPOLLOUT)
                 #拷贝数据，触发pollin事件
                 node[self.downward_fd].down_flow = self.down_flow    
-                epoll.modify(tmp_sk_fd, select.EPOLLIN)
                 self.down_flow = None
-		
-        #如果是普通的服务端节点
-        if self.node_type is NODE_TYPE_NORMAL_SERVER:
-            #处理下行流量
-			if self.down_flow is not None:
-				self.sockfd.send(self.down_flow)
-                self.down_flow = None
-			if self.up_flow is not None:
-                node[self.upward_fd].up_flow = self.up_flow
-                epoll.modify(self.upward_fd, select.EPOLLOUT)
             
         #如果是代理节点客户端
         if self.node_type is NODE_TYPE_PROXY_CLIENT:
             #处理上行流量
 			if self.up_flow is not None:
-				self.sockfd.send(self.up_flow.data)
-                self.up_flow = None
+                byteswritten = self.conn.send(self.up_flow)
+	            self.up_flow = self.up_flow[byteswritten:]
+                if len(self.up_flow) == 0:
+                    self.up_flow = None
             #处理下行流量
             if self.down_flow is not None：
                 if self.downward_fd == -1:
@@ -109,24 +98,27 @@ class node():
                     #初始化代理node
                     node[tmp_sk_fd] = node()
                     node[tmp_sk_fd].upward_fd = self.sockfd
-                    node[tmp_sk_fd].sockfd = tmp_sk_fd
+                    node[tmp_sk_fd].conn = sock
                     node[tmp_sk_fd].node_type = NODE_TYPE_PROXY_SERVER
                     self.downward_fd = tmp_sk_fd
-                    epoll.register(tmp_sk_fd, select.EPOLLIN)
+                    epoll.register(tmp_sk_fd, select.EPOLLOUT)
                 #拷贝数据，触发pollin事件
                 node[self.downward_fd].down_flow = self.down_flow    
-                epoll.modify(tmp_sk_fd, select.EPOLLIN)
-                self.down_flow = None        
-        
-        #如果是代理节点服务端
-        if self.node_type is NODE_TYPE_PROXY_SERVER:
+                self.down_flow = None    
+            
+        #如果是普通/代理的服务端节点
+        if self.node_type is NODE_TYPE_NORMAL_SERVER or NODE_TYPE_PROXY_SERVER:
             #处理下行流量
-			if self.down_flow is not None:
-				self.sockfd.send(self.down_flow)
-                self.down_flow = None
+            if self.down_flow is not None:
+                byteswritten = self.conn.send(self.down_flow)
+	            self.down_flow = self.down_flow[byteswritten:]
+                if len(self.down_flow) == 0:
+                    self.down_flow = None
+            #处理上行流量
 			if self.up_flow is not None:
                 node[self.upward_fd].up_flow = self.up_flow
-                epoll.modify(self.upward_fd, select.EPOLLOUT) 
+                epoll.modify(self.upward_fd, select.EPOLLOUT)
+                self.up_flow = None
 				
 	def handle_close(self):
         if self.epoll is None:

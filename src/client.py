@@ -28,35 +28,28 @@ def main_loop():
 
 	            #初始化节点
 	            normal_node = node()
-	            normal_node.sockfd = connection.fileno()
+	            normal_node.conn = connection
 	            normal_node.node_type = NODE_TYPE_NORMAL_CLIENT
 
 	            #注册epoll事件
 	            epoll.register(connection.fileno(), select.EPOLLIN)
 	            node[connection.fileno()] = normal_node
 
+            elif event & select.EPOLLHUP:
+                node[fileno].handle_close()
+            
 	         elif event & select.EPOLLIN:
-	         	#接受到请求数据
-	         	tmp_node = node[fileno]
-	         	tmp_data += node[fileno].conn.recv(1024)
-
-	         	tmp_node.flow = flow()
-	         	#根据tmp_data初始化节点流量
-	            if 'GET' in tmp_data:
-	            	tmp_node.down_flow = tmp_data
-                    tmp_node.handle_flow()
+                data += node[fileno].conn.recv(1024)
+                
+                if node[fileno].node_type is NODE_TYPE_NORMAL_CLIENT:
+                    node[fileno].down_flow += data
+                elif node[fileno].node_type is NODE_TYPE_NORMAL_SERVER:
+                    node[fileno].up_flow += data
+                
+                node[fileno].handle_flow()
                     
 	         elif event & select.EPOLLOUT:
-	            byteswritten = connections[fileno].send(responses[fileno])
-	            responses[fileno] = responses[fileno][byteswritten:]
-	            if len(responses[fileno]) == 0:
-	               epoll.modify(fileno, 0)
-	               connections[fileno].shutdown(socket.SHUT_RDWR)
-	         elif event & select.EPOLLHUP:
-	            epoll.unregister(fileno)
-	            connections[fileno].close()
-	            del connections[fileno]
-                
+	            node[fileno].handle_flow()           
                 
 	finally:
 	   epoll.unregister(ssock.fileno())

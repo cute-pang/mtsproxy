@@ -3,55 +3,58 @@
 from pub.py import *
 import socket, select
 
+def main_loop():
+	EOL1 = b'\n\n'
+	EOL2 = b'\n\r\n'
 
-EOL1 = b'\n\n'
-EOL2 = b'\n\r\n'
-response  = b'HTTP/1.0 200 OK\r\nDate: Mon, 1 Jan 1996 01:01:01 GMT\r\n'
-response += b'Content-Type: text/plain\r\nContent-Length: 13\r\n\r\n'
-response += b'Hello, world!'
+	ssock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	ssock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+	ssock.bind(('0.0.0.0', GLOBAL_PROXY_PORT))
+	ssock.listen(1)
+	ssock.setblocking(0)
+	ssock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
-serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-serversocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-serversocket.bind(('0.0.0.0', 8080))
-serversocket.listen(1)
-serversocket.setblocking(0)
-serversocket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+	epoll.register(ssock.fileno(), select.EPOLLIN)
 
-epoll = select.epoll()
-epoll.register(serversocket.fileno(), select.EPOLLIN)
+	try:
+	   
+	   while True:
+	      events = epoll.poll(1)
+	      for fileno, event in events:
+	         if fileno == ssock.fileno():
+	         	#建立连接
+	            connection, address = ssock.accept()
+	            connection.setblocking(0)
 
-try:
-   connections = {}; requests = {}; responses = {}
-   while True:
-      events = epoll.poll(1)
-      for fileno, event in events:
-         if fileno == serversocket.fileno():
-            connection, address = serversocket.accept()
-            connection.setblocking(0)
-            epoll.register(connection.fileno(), select.EPOLLIN)
-            connections[connection.fileno()] = connection
-            requests[connection.fileno()] = b''
-            responses[connection.fileno()] = response
-         elif event & select.EPOLLHUP:
-            epoll.unregister(fileno)
-            connections[fileno].close()
-            del connections[fileno]
-         elif event & select.EPOLLIN:
-            requests[fileno] += connections[fileno].recv(1024)
-            if EOL1 in requests[fileno] or EOL2 in requests[fileno]:
-               epoll.modify(fileno, select.EPOLLOUT)
-               print('-'*40 + '\n' + requests[fileno].decode()[:-2])
-         elif event & select.EPOLLOUT:
-            byteswritten = connections[fileno].send(responses[fileno])
-            responses[fileno] = responses[fileno][byteswritten:]
-            if len(responses[fileno]) == 0:
-               epoll.modify(fileno, 0)
-               connections[fileno].shutdown(socket.SHUT_RDWR)
-         
-finally:
-   epoll.unregister(serversocket.fileno())
-   epoll.close()
-   serversocket.close()
+	            #初始化节点
+	            normal_node = node()
+	            normal_node.conn = connection
+	            normal_node.node_type = NODE_TYPE_PROXY_CLIENT
+
+	            #注册epoll事件
+	            epoll.register(connection.fileno(), select.EPOLLIN)
+	            node[connection.fileno()] = normal_node
+
+            elif event & select.EPOLLHUP:
+                node[fileno].handle_close()
+            
+	         elif event & select.EPOLLIN:
+                data += node[fileno].conn.recv(1024)
+                
+                if node[fileno].node_type is NODE_TYPE_PROXY_CLIENT:
+                    node[fileno].down_flow += data
+                elif node[fileno].node_type is NODE_TYPE_PROXY_SERVER:
+                    node[fileno].up_flow += data
+                
+                node[fileno].handle_flow()
+                    
+	         elif event & select.EPOLLOUT:
+	            node[fileno].handle_flow()           
+                
+	finally:
+	   epoll.unregister(ssock.fileno())
+	   epoll.close()
+	   ssock.close()
 
 
    
