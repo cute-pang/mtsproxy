@@ -4,19 +4,19 @@ from pub.py import *
 import socket, select
 
 def main_loop():
-	EOL1 = b'\n\n'
-	EOL2 = b'\n\r\n'
+    EOL1 = b'\n\n'
+    EOL2 = b'\n\r\n'
 
-	ssock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	ssock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-	ssock.bind(('0.0.0.0', GLOBAL_PROXY_PORT))
-	ssock.listen(1)
-	ssock.setblocking(0)
-	ssock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    ssock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    ssock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    ssock.bind(('0.0.0.0', GLOBAL_PROXY_PORT))
+    ssock.listen(1)
+    ssock.setblocking(0)
+    ssock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
-	epoll.register(ssock.fileno(), select.EPOLLIN)
+    epoll.register(ssock.fileno(), select.EPOLLIN)
 
-	try:
+    try:
         while True:
             events = epoll.poll(1)
             for fileno, event in events:
@@ -50,10 +50,9 @@ def main_loop():
                 elif event & select.EPOLLOUT:
                     node[fileno].handle_flow()           
                 
-	finally:
-	   epoll.unregister(ssock.fileno())
-	   epoll.close()
-	   ssock.close()
+    finally:
+       epoll.unregister(ssock.fileno())
+       epoll.close()
+       ssock.close()
 
-
-   
+main_loop() 

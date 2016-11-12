@@ -2,8 +2,8 @@
 import socket, select
 
 GLOBAL_PROXY_PORT = 8080
-PROXY_SERVER_IP = '23.83.226.130'
-PROXY_SERVER_PORT = 8080
+PROXY_SERVER_IP = '127.0.0.1'
+PROXY_SERVER_PORT = 8081
 
 HTTPS_PROT = 443
 
@@ -44,31 +44,31 @@ def connect_to_remote(ip, port, need_warp):
 
 #节点类,用于传输上行或者下行流量
 class node():
-	def __init__(self):
-		#上行/下行描述符，如果为-1，则使用sockfd收发数据
-		self.upward_fd = -1
-		self.downward_fd = -1
-		self.conn = -1
+    def __init__(self):
+        #上行/下行描述符，如果为-1，则使用sockfd收发数据
+        self.upward_fd = -1
+        self.downward_fd = -1
+        self.conn = -1
 
-		#设置节点收发缓冲区
-		self.down_flow = None
-		self.up_flow = None
-        
+        #设置节点收发缓冲区
+        self.down_flow = None
+        self.up_flow = None
+
         self.node_type = -1
 
-	def handle_flow(self):
+    def handle_flow(self):
         #如果是普通的客户端节点
-		if self.node_type is NODE_TYPE_NORMAL_CLIENT:
+        if self.node_type is NODE_TYPE_NORMAL_CLIENT:
             #处理上行流量
-			if self.up_flow is not None:
+            if self.up_flow is not None:
                 byteswritten = self.conn.send(self.up_flow)
-	            self.up_flow = self.up_flow[byteswritten:]
+                self.up_flow = self.up_flow[byteswritten:]
                 if len(self.up_flow) == 0:
                     self.up_flow = None
 			
             #处理下行流量
             if self.down_flow is not None:
-				if self.downward_fd == -1:
+                if self.downward_fd == -1:
                     sock = connect_to_remote(PROXY_SERVER_IP, PROXY_SERVER_PORT, FALSE)
                     tmp_sk_fd = sock.fileno()
                     #初始化代理node
@@ -85,13 +85,13 @@ class node():
         #如果是代理节点客户端
         if self.node_type is NODE_TYPE_PROXY_CLIENT:
             #处理上行流量
-			if self.up_flow is not None:
+            if self.up_flow is not None:
                 byteswritten = self.conn.send(self.up_flow)
-	            self.up_flow = self.up_flow[byteswritten:]
+                self.up_flow = self.up_flow[byteswritten:]
                 if len(self.up_flow) == 0:
                     self.up_flow = None
             #处理下行流量
-            if self.down_flow is not None：
+            if self.down_flow is not None:
                 if self.downward_fd == -1:
                     sock = connect_to_remote(HOST, HTTPS_PROT, TRUE)
                     tmp_sk_fd = sock.fileno()
@@ -111,24 +111,21 @@ class node():
             #处理下行流量
             if self.down_flow is not None:
                 byteswritten = self.conn.send(self.down_flow)
-	            self.down_flow = self.down_flow[byteswritten:]
+                self.down_flow = self.down_flow[byteswritten:]
                 if len(self.down_flow) == 0:
                     self.down_flow = None
             #处理上行流量
-			if self.up_flow is not None:
+            if self.up_flow is not None:
                 node[self.upward_fd].up_flow = self.up_flow
                 epoll.modify(self.upward_fd, select.EPOLLOUT)
                 self.up_flow = None
 				
-	def handle_close(self):
-        if self.epoll is None:
-            return 
-        else:
-            self.epoll.unregister(self.sockfd)
-            if (self.node_type == NODE_TYPE_NORMAL_CLIENT) or (self.node_type == NODE_TYPE_PROXY_CLIENT):
-                self.epoll.modify(self.downward_fd, select.EPOLLHUP)
-            self.sockfd.close()
-            del node[self.sockfd]
+    def handle_close(self):
+        epoll.unregister(self.conn.fileno())
+        if (self.node_type == NODE_TYPE_NORMAL_CLIENT) or (self.node_type == NODE_TYPE_PROXY_CLIENT):
+            epoll.modify(self.downward_fd, select.EPOLLHUP)
+        self.conn.close()
+        del node[self.conn.fileno()]
             
     def resolve_dns(self):
         #先用最简单的方式，可以扩展
