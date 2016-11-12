@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*- 
 
-from pub.py import *
+from pub import *
 import socket, select
 
 def main_loop():
@@ -9,7 +9,7 @@ def main_loop():
 
 	ssock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	ssock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-	ssock.bind(('0.0.0.0', GLOBAL_PROXY_PORT))
+	ssock.bind((GLOBAL_LOCAL_IP, GLOBAL_LOCAL_PROT))
 	ssock.listen(1)
 	ssock.setblocking(0)
 	ssock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)

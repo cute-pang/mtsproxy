@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*- 
 import socket, select
 
-GLOBAL_PROXY_PORT = 8080
-PROXY_SERVER_IP = '127.0.0.1'
+GLOBAL_LOCAL_IP = '0.0.0.0'
+GLOBAL_LOCAL_PROT = 8080
+
+PROXY_SERVER_IP = '0.0.0.0'
 PROXY_SERVER_PORT = 8081
 
-HTTPS_PROT = 443
+HOST = '0.0.0.0'
+HTTPS_PROT = 8082
 
 NODE_TYPE_NORMAL_CLIENT = 0
 NODE_TYPE_NORMAL_SERVER = 1
@@ -69,7 +72,7 @@ class node():
             #处理下行流量
             if self.down_flow is not None:
                 if self.downward_fd == -1:
-                    sock = connect_to_remote(PROXY_SERVER_IP, PROXY_SERVER_PORT, FALSE)
+                    sock = connect_to_remote(PROXY_SERVER_IP, PROXY_SERVER_PORT, False)
                     tmp_sk_fd = sock.fileno()
                     #初始化代理node
                     node[tmp_sk_fd] = node()
@@ -93,7 +96,7 @@ class node():
             #处理下行流量
             if self.down_flow is not None:
                 if self.downward_fd == -1:
-                    sock = connect_to_remote(HOST, HTTPS_PROT, TRUE)
+                    sock = connect_to_remote(HOST, HTTPS_PROT, False)
                     tmp_sk_fd = sock.fileno()
                     #初始化代理node
                     node[tmp_sk_fd] = node()
