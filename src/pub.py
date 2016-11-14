@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*- 
-import socket, select
+import socket, select,ssl, sys
 
-GLOBAL_LOCAL_IP = '0.0.0.0'
+GLOBAL_LOCAL_IP = '127.0.0.1'
 GLOBAL_LOCAL_PROT = 8080
 
-PROXY_SERVER_IP = '0.0.0.0'
+PROXY_SERVER_IP = '127.0.0.1'
 PROXY_SERVER_PORT = 8081
 
-HOST = '0.0.0.0'
+HOST = '127.0.0.1'
 HTTPS_PROT = 8082
 
 NODE_TYPE_NORMAL_CLIENT = 0
@@ -15,8 +15,9 @@ NODE_TYPE_NORMAL_SERVER = 1
 NODE_TYPE_PROXY_CLIENT = 2
 NODE_TYPE_PROXY_SERVER = 3
 
-#全局node列表
-node = {}
+#超时时间
+timeout = 10
+
 #全局epoll
 epoll = select.epoll()
 
@@ -45,6 +46,9 @@ def connect_to_remote(ip, port, need_warp):
     status = fp.readline(line_len).split()[1]
 '''
 
+#全局node列表
+g_node = {}
+        
 #节点类,用于传输上行或者下行流量
 class node():
     def __init__(self):
@@ -75,14 +79,14 @@ class node():
                     sock = connect_to_remote(PROXY_SERVER_IP, PROXY_SERVER_PORT, False)
                     tmp_sk_fd = sock.fileno()
                     #初始化代理node
-                    node[tmp_sk_fd] = node()
-                    node[tmp_sk_fd].upward_fd = self.sockfd
-                    node[tmp_sk_fd].conn = sock
-                    node[tmp_sk_fd].node_type = NODE_TYPE_NORMAL_SERVER
+                    g_node[tmp_sk_fd] = node()
+                    g_node[tmp_sk_fd].upward_fd = self.conn.fileno()
+                    g_node[tmp_sk_fd].conn = sock
+                    g_node[tmp_sk_fd].node_type = NODE_TYPE_NORMAL_SERVER
                     self.downward_fd = tmp_sk_fd
-                    epoll.register(tmp_sk_fd, select.EPOLLOUT)
+                    epoll.register(tmp_sk_fd, select.EPOLLOUT|select.EPOLLIN|select.EPOLLHUP)
                 #拷贝数据，触发pollin事件
-                node[self.downward_fd].down_flow = self.down_flow    
+                g_node[self.downward_fd].down_flow = self.down_flow    
                 self.down_flow = None
             
         #如果是代理节点客户端
@@ -99,14 +103,14 @@ class node():
                     sock = connect_to_remote(HOST, HTTPS_PROT, False)
                     tmp_sk_fd = sock.fileno()
                     #初始化代理node
-                    node[tmp_sk_fd] = node()
-                    node[tmp_sk_fd].upward_fd = self.sockfd
-                    node[tmp_sk_fd].conn = sock
-                    node[tmp_sk_fd].node_type = NODE_TYPE_PROXY_SERVER
+                    g_node[tmp_sk_fd] = node()
+                    g_node[tmp_sk_fd].upward_fd = self.conn.fileno()
+                    g_node[tmp_sk_fd].conn = sock
+                    g_node[tmp_sk_fd].node_type = NODE_TYPE_PROXY_SERVER
                     self.downward_fd = tmp_sk_fd
-                    epoll.register(tmp_sk_fd, select.EPOLLOUT)
+                    epoll.register(tmp_sk_fd, select.EPOLLOUT|select.EPOLLIN|select.EPOLLHUP)
                 #拷贝数据，触发pollin事件
-                node[self.downward_fd].down_flow = self.down_flow    
+                g_node[self.downward_fd].down_flow = self.down_flow    
                 self.down_flow = None    
             
         #如果是普通/代理的服务端节点
@@ -119,19 +123,23 @@ class node():
                     self.down_flow = None
             #处理上行流量
             if self.up_flow is not None:
-                node[self.upward_fd].up_flow = self.up_flow
-                epoll.modify(self.upward_fd, select.EPOLLOUT)
+                g_node[self.upward_fd].up_flow = self.up_flow
+                #epoll.modify(self.upward_fd, select.EPOLLOUT)
                 self.up_flow = None
-				
+
     def handle_close(self):
         epoll.unregister(self.conn.fileno())
         if (self.node_type == NODE_TYPE_NORMAL_CLIENT) or (self.node_type == NODE_TYPE_PROXY_CLIENT):
-            epoll.modify(self.downward_fd, select.EPOLLHUP)
+            g_node[self.downward_fd].conn.close()
+            #epoll.modify(self.downward_fd, select.EPOLLHUP)
+        #self.conn.shutdown(socket.SHUT_RDWR)
         self.conn.close()
-        del node[self.conn.fileno()]
-            
+        del g_node[self.conn.fileno()]
+    
+    '''
     def resolve_dns(self):
         #先用最简单的方式，可以扩展
         return socket.gethostby_name(self.flow.host)
+    '''
         
         

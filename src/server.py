@@ -31,24 +31,26 @@ def main_loop():
                     normal_node.node_type = NODE_TYPE_PROXY_CLIENT
 
                     #注册epoll事件
-                    epoll.register(connection.fileno(), select.EPOLLIN)
-                    node[connection.fileno()] = normal_node
+                    epoll.register(connection.fileno(), select.EPOLLIN|select.EPOLLOUT|select.EPOLLHUP)
+                    g_node[connection.fileno()] = normal_node
 
                 elif event & select.EPOLLHUP:
-                    node[fileno].handle_close()
+                    print 'server abc'
+                    g_node[fileno].handle_close()
             
                 elif event & select.EPOLLIN:
-                    data += node[fileno].conn.recv(1024)
+                    data = g_node[fileno].conn.recv(1024)
+                    print data
                 
-                    if node[fileno].node_type is NODE_TYPE_PROXY_CLIENT:
-                        node[fileno].down_flow += data
-                    elif node[fileno].node_type is NODE_TYPE_PROXY_SERVER:
-                        node[fileno].up_flow += data
+                    if g_node[fileno].node_type is NODE_TYPE_PROXY_CLIENT:
+                        g_node[fileno].down_flow = data
+                    elif g_node[fileno].node_type is NODE_TYPE_PROXY_SERVER:
+                        g_node[fileno].up_flow = data
                 
-                    node[fileno].handle_flow()
+                    g_node[fileno].handle_flow()
                     
                 elif event & select.EPOLLOUT:
-                    node[fileno].handle_flow()           
+                    g_node[fileno].handle_flow()           
                 
     finally:
        epoll.unregister(ssock.fileno())

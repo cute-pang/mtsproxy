@@ -8,11 +8,11 @@ tcpCliSock.bind(('127.0.0.1', HTTPS_PROT))
 tcpCliSock.listen(1)
 
 while True:
-	ss = tcpCliSock.accept()
+	ss, addr = tcpCliSock.accept()
 	try:
 		while True:
 			str = ss.recv(1024)
 			print str
-			ss.sendall("Hello world message comes from loopback server.!")
+			ss.send("Hello world message comes from loopback server.!")
 	finally:
 		ss.close()
