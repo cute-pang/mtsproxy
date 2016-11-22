@@ -72,7 +72,7 @@ class node():
                 self.up_flow = self.up_flow[byteswritten:]
                 if len(self.up_flow) == 0:
                     self.up_flow = None
-			
+                epoll.modify(self.conn.fileno(), select.EPOLLIN)
             #处理下行流量
             if self.down_flow is not None:
                 if self.downward_fd == -1:
@@ -84,10 +84,11 @@ class node():
                     g_node[tmp_sk_fd].conn = sock
                     g_node[tmp_sk_fd].node_type = NODE_TYPE_NORMAL_SERVER
                     self.downward_fd = tmp_sk_fd
-                    epoll.register(tmp_sk_fd, select.EPOLLOUT|select.EPOLLIN|select.EPOLLHUP)
+                    epoll.register(tmp_sk_fd, select.EPOLLIN)
                 #拷贝数据，触发pollin事件
                 g_node[self.downward_fd].down_flow = self.down_flow    
                 self.down_flow = None
+                epoll.modify(self.downward_fd, select.EPOLLOUT)
             
         #如果是代理节点客户端
         if self.node_type is NODE_TYPE_PROXY_CLIENT:
@@ -97,6 +98,7 @@ class node():
                 self.up_flow = self.up_flow[byteswritten:]
                 if len(self.up_flow) == 0:
                     self.up_flow = None
+                epoll.modify(self.conn.fileno(), select.EPOLLIN)
             #处理下行流量
             if self.down_flow is not None:
                 if self.downward_fd == -1:
@@ -108,10 +110,11 @@ class node():
                     g_node[tmp_sk_fd].conn = sock
                     g_node[tmp_sk_fd].node_type = NODE_TYPE_PROXY_SERVER
                     self.downward_fd = tmp_sk_fd
-                    epoll.register(tmp_sk_fd, select.EPOLLOUT|select.EPOLLIN|select.EPOLLHUP)
+                    epoll.register(tmp_sk_fd, select.EPOLLIN)
                 #拷贝数据，触发pollin事件
                 g_node[self.downward_fd].down_flow = self.down_flow    
-                self.down_flow = None    
+                self.down_flow = None
+                epoll.modify(self.downward_fd, select.EPOLLOUT)
             
         #如果是普通/代理的服务端节点
         if self.node_type is NODE_TYPE_NORMAL_SERVER or NODE_TYPE_PROXY_SERVER:
@@ -121,15 +124,17 @@ class node():
                 self.down_flow = self.down_flow[byteswritten:]
                 if len(self.down_flow) == 0:
                     self.down_flow = None
+                epoll.modify(self.conn.fileno(), select.EPOLLIN)
             #处理上行流量
             if self.up_flow is not None:
                 g_node[self.upward_fd].up_flow = self.up_flow
-                #epoll.modify(self.upward_fd, select.EPOLLOUT)
                 self.up_flow = None
+                epoll.modify(self.upward_fd, select.EPOLLOUT)
 
     def handle_close(self):
         epoll.unregister(self.conn.fileno())
         if (self.node_type == NODE_TYPE_NORMAL_CLIENT) or (self.node_type == NODE_TYPE_PROXY_CLIENT):
+            g_node[self.downward_fd].conn.shutdown(socket.SHUT_RDWR)
             g_node[self.downward_fd].conn.close()
             #epoll.modify(self.downward_fd, select.EPOLLHUP)
         #self.conn.shutdown(socket.SHUT_RDWR)

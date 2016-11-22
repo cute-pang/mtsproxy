@@ -10,7 +10,7 @@ def main_loop():
     ssock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     ssock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     ssock.bind((GLOBAL_LOCAL_IP, GLOBAL_LOCAL_PROT))
-    ssock.listen(1)
+    ssock.listen(5)
     ssock.setblocking(0)
     ssock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
@@ -31,7 +31,7 @@ def main_loop():
                     normal_node.node_type = NODE_TYPE_NORMAL_CLIENT
 
                     #注册epoll事件
-                    epoll.register(connection.fileno(), select.EPOLLIN|select.EPOLLOUT|select.EPOLLHUP)
+                    epoll.register(connection.fileno(), select.EPOLLIN)
                     g_node[connection.fileno()] = normal_node
 
                 elif event & select.EPOLLHUP:
@@ -40,7 +40,6 @@ def main_loop():
             
                 elif event & select.EPOLLIN:
                     data = g_node[fileno].conn.recv(1024)
-                    print data
                 
                     if g_node[fileno].node_type is NODE_TYPE_NORMAL_CLIENT:
                         g_node[fileno].down_flow = data
@@ -50,7 +49,7 @@ def main_loop():
                     g_node[fileno].handle_flow()
                     
                 elif event & select.EPOLLOUT:
-                    g_node[fileno].handle_flow()           
+                    g_node[fileno].handle_flow()
                 
     finally:
        epoll.unregister(ssock.fileno())
