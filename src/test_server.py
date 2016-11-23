@@ -13,6 +13,6 @@ while True:
         str = ss.recv(1024)
         print str
         ss.send("Hello world message comes from loopback server.!")
-        ss.close()
+        #ss.close()
     except:
         pass
