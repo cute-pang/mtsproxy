@@ -132,14 +132,21 @@ class node():
                 epoll.modify(self.upward_fd, select.EPOLLOUT)
 
     def handle_close(self):
-        epoll.unregister(self.conn.fileno())
-        if (self.node_type == NODE_TYPE_NORMAL_CLIENT) or (self.node_type == NODE_TYPE_PROXY_CLIENT):
+        #关闭下一跳节点
+        if self.downward_fd != -1:
+            epoll.modify(self.downward_fd, 0)
+            epoll.unregister(self.downward_fd)
             g_node[self.downward_fd].conn.shutdown(socket.SHUT_RDWR)
             g_node[self.downward_fd].conn.close()
-            #epoll.modify(self.downward_fd, select.EPOLLHUP)
-        #self.conn.shutdown(socket.SHUT_RDWR)
+            del g_node[self.downward_fd]
+
+        #关闭本节点
+        node_fd = self.conn.fileno()
+        epoll.modify(node_fd, 0)
+        epoll.unregister(node_fd)
+        self.conn.shutdown(socket.SHUT_RDWR)
         self.conn.close()
-        del g_node[self.conn.fileno()]
+        del g_node[node_fd]
     
     '''
     def resolve_dns(self):

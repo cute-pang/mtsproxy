@@ -33,14 +33,14 @@ def main_loop():
                     #注册epoll事件
                     epoll.register(connection.fileno(), select.EPOLLIN)
                     g_node[connection.fileno()] = normal_node
-
-                elif event & select.EPOLLHUP:
-                    print "abc"
-                    g_node[fileno].handle_close()
             
                 elif event & select.EPOLLIN:
                     data = g_node[fileno].conn.recv(1024)
-                
+                    #连接被关闭
+                    if (len(data) == 0) and (g_node.has_key(fileno)):
+                        g_node[fileno].handle_close()
+                        continue
+
                     if g_node[fileno].node_type is NODE_TYPE_NORMAL_CLIENT:
                         g_node[fileno].down_flow = data
                     elif g_node[fileno].node_type is NODE_TYPE_NORMAL_SERVER:
