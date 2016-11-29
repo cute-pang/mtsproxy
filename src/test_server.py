@@ -1,10 +1,9 @@
-from pub import *
 
-import socket
+import socket,time
 
 tcpCliSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-tcpCliSock.bind(('127.0.0.1', HTTPS_PROT))
+tcpCliSock.bind(('127.0.0.1', 8085))
 tcpCliSock.listen(5)
 
 while True:
@@ -13,6 +12,7 @@ while True:
         str = ss.recv(1024)
         print str
         ss.send("Hello world message comes from loopback server.!")
-        #ss.close()
+        time.sleep(10)
+        ss.close()
     except:
         pass

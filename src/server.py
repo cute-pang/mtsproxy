@@ -1,60 +1,55 @@
-# -*- coding: utf-8 -*- 
+# -*- coding: utf-8 -*-
+import socket, select, threading, time
+from global_param import g_epoll
 
-from pub import *
-import socket, select
+send_mutex = threading.Lock()
+recv_mutex = threading.Lock()
+
+g_server_recv_list = []
+g_server_send_list = []
+
+g_fd_map2_request = {}
+g_fd_map2_sock = {}
+
+def send_worker(send_sock):
+    while True:
+        if send_mutex.acquire(1):
+            for index in range(0, len(g_server_send_list)):
+                rsp = g_server_send_list.pop()
+                send_sock.send(rsp)
+            send_mutex.release()
+        time.sleep(1)
+
+def server_send_thread_init():
+    send_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    send_sock.connect(('127.0.0.1', 8081))
+    worker = threading.Thread(target=send_worker, args=(send_sock,))
+    worker.start()
 
 def main_loop():
-    EOL1 = b'\n\n'
-    EOL2 = b'\n\r\n'
-
-    ssock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    ssock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    ssock.bind((PROXY_SERVER_IP, PROXY_SERVER_PORT))
-    ssock.listen(5)
-    ssock.setblocking(0)
-    ssock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-
-    epoll.register(ssock.fileno(), select.EPOLLIN)
-
     try:
         while True:
-            events = epoll.poll(1)
+            events = g_epoll.poll(1)
             for fileno, event in events:
-                if fileno == ssock.fileno():
-                    #建立连接
-                    connection, address = ssock.accept()
-                    connection.setblocking(0)
-
-                    #初始化节点
-                    normal_node = node()
-                    normal_node.conn = connection
-                    normal_node.node_type = NODE_TYPE_PROXY_CLIENT
-
-                    #注册epoll事件
-                    epoll.register(connection.fileno(), select.EPOLLIN)
-                    g_node[connection.fileno()] = normal_node
-            
-                elif event & select.EPOLLIN:
-                    data = g_node[fileno].conn.recv(1024)
+                if event & select.EPOLLIN:
+                    for key in g_fd_map2_request.keys():
+                        print g_fd_map2_request[key]
+                    data = g_fd_map2_sock[fileno].recv(1010)
 
                     #连接被关闭
-                    if (len(data) == 0) and (g_node.has_key(fileno)):
-                        g_node[fileno].handle_close()
+                    if (len(data) == 0):
                         continue
 
-                    if g_node[fileno].node_type is NODE_TYPE_PROXY_CLIENT:
-                        g_node[fileno].down_flow = data
-                    elif g_node[fileno].node_type is NODE_TYPE_PROXY_SERVER:
-                        g_node[fileno].up_flow = data
-                
-                    g_node[fileno].handle_flow()
-                    
-                elif event & select.EPOLLOUT:
-                    g_node[fileno].handle_flow()
-                
+                    #TODO构造response数据
+                    request = g_fd_map2_request[fileno]
+                    response = "%s%s"%(request[:5], data)
+                    if send_mutex.acquire(1):
+                        #将response送添加到发送链表
+                        g_server_send_list.append(response)
+                        send_mutex.release()
     finally:
-       epoll.unregister(ssock.fileno())
-       epoll.close()
-       ssock.close()
+       g_epoll.close()
 
-main_loop() 
+if __name__ == "__main__":
+    server_send_thread_init()
+    main_loop()
